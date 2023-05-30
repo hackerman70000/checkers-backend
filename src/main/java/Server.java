@@ -1,92 +1,77 @@
-import java.io.*;
-import java.net.InetAddress;
+import java.io.BufferedReader;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.io.InputStreamReader;
+import java.util.Scanner;
 
 public class Server {
-	private ServerSocket serverSocket;
+    public static void main(String[] args) throws Exception {
+        ServerSocket ss = new ServerSocket(3333);
+        Socket s = ss.accept();
+        DataInputStream din = new DataInputStream(s.getInputStream());
+        DataOutputStream dout = new DataOutputStream(s.getOutputStream());
+        Scanner scanner = new Scanner(System.in);
 
-	public Server(String IP, int port) throws IOException {
-		serverSocket = new ServerSocket(port, 0, InetAddress.getByName(IP));
-	}
+        boolean gameOver = false;
+        int columnStart;
+        int rowStart;
+        int columnMove;
+        int rowMove;
+        boolean correctStartField;
+        boolean turn;
+        boolean playerTurn;
 
-	public void host() throws IOException {
-		while (true) {
-			try {
-				System.out.println("Czekanie na połączenie się klienta...");
-				Socket soc = serverSocket.accept();
-				System.out.println("Nawiązano połączenie.");
-
-				ObjectOutputStream out = new ObjectOutputStream(soc.getOutputStream());
-				ObjectInputStream in = new ObjectInputStream(soc.getInputStream());
-
-				Game game = new Game(8); // Tworzymy nową instancję gry
-
-				out.writeObject(game);
-
-				while (true) {
-					sendAndReceiveMove(out, in, game);
-				}
-
-			} catch (Exception e) {
-				System.err.println (e);
-			}
-		}
-	}
-
-	private void sendAndReceiveMove(ObjectOutputStream out, ObjectInputStream in, Game game) throws Exception {
-		if (game.isPlayerTurn()) {
-			BufferedReader serverReader = new BufferedReader(new InputStreamReader(System.in));
-			System.out.println("Ruch serwera. Wpisz pionek do przesunięcia: ");
-			String serverPieceToMove = serverReader.readLine();
-
-			if(serverPieceToMove.equals("xx")){
-				throw new Exception("Wyszedłeś.");
-			}
-
-			System.out.println("Wpisz ruch jaki chcesz wykonać: ");
-			String serverMove = serverReader.readLine();
-
-			if(serverMove.equals("xx")){
-				throw new Exception("Wyszedłeś.");
-			}
-
-			game.makeMove(serverPieceToMove, serverMove);
-			game.getBoard().displayBoard();
-
-			out.reset();
-			out.writeObject(game);
-			out.flush();
-
-		} else {
-			String pieceToMove = (String) in.readObject();
-			System.out.println("Serwer otrzymał pionek do poruszenia: " + pieceToMove);
-
-			if(pieceToMove.equals("xx")){
-				throw new Exception("Drugi gracz wyszedł.");
-			}
-
-			String move = (String) in.readObject();
-			System.out.println("Serwer otrzymał ruch do wykonania: " + move);
-
-			game.makeMove(pieceToMove, move);
-			game.getBoard().displayBoard();
-
-			out.reset();
-			out.writeObject(game);
-			out.flush();
-		}
-	}
-
-	public void closeGame() throws IOException {
-		if (serverSocket != null && !serverSocket.isClosed()) {
-			serverSocket.close();
-			System.out.println("Gra została zamknięta, a gniazdo serwera zostało wyłączone.");
-		}
-	}
-
-	public static void main(String[] args) throws Exception {
-		Server server = new Server("localhost", 9899);
-		server.host();
-	}
+        while (!gameOver) {
+            turn = true;
+            String board = "";
+            while (board.equals("")) {
+                board = din.readUTF();
+            }
+            System.out.println(board);
+            playerTurn = din.readBoolean();
+            if (playerTurn) {
+                System.out.println("Ruch białych, czekaj na swój ruch");
+            } else {
+                System.out.println("Ruch czarnych");
+                String msg1 = "";
+                msg1 = din.readUTF();
+                System.out.println(msg1);
+                while (true) {
+                    columnStart = (int) Character.toUpperCase(scanner.next().charAt(0)) - 65;
+                    dout.writeInt(columnStart);
+                    dout.flush();
+                    rowStart = scanner.nextInt() - 1;
+                    dout.writeInt(rowStart);
+                    dout.flush();
+                    correctStartField = din.readBoolean();
+                    if (correctStartField) break;
+                    System.out.println("Wybrano zly pionek, prosze wybrac ponownie");
+                }
+                while (turn) {
+                    String msg2 = "";
+                    msg2 = din.readUTF();
+                    System.out.println(msg2);
+                    while (true) {
+                        columnMove = (int) Character.toUpperCase(scanner.next().charAt(0)) - 65;
+                        dout.writeInt(columnMove);
+                        dout.flush();
+                        if (columnMove == 23) {
+                            break;
+                        }
+                        rowMove = scanner.nextInt() - 1;
+                        dout.writeInt(rowMove);
+                        dout.flush();
+                    }
+                    turn = din.readBoolean();
+                }
+                gameOver = din.readBoolean();
+                if (gameOver) {
+                    din.close();
+                    dout.close();
+                }
+            }
+        }
+    }
 }

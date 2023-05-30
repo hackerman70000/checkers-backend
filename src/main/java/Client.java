@@ -1,68 +1,188 @@
-import java.io.*;
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Scanner;
 
 public class Client {
-	Socket socket;
+    private static int boardSize;
 
-	public Client(String IP, int port) throws IOException {
-		socket = new Socket(IP, port);
-	}
+    public static void main(String[] args) throws Exception {
+        Socket s = new Socket("localhost", 3333);
+        DataInputStream din = new DataInputStream(s.getInputStream());
+        DataOutputStream dout = new DataOutputStream(s.getOutputStream());
 
-	public void connect() throws Exception {
-		System.out.println("Klient uruchomiony.");
+        Scanner scanner = new Scanner(System.in);
+        printMenu();
+        int choice;
+        do {
+            choice = scanner.nextInt();
+            switch (choice) {
+                case 1:
+                    continue;
+                case 2:
+                    //loadGame();
+                    break;
+                case 3:
+                    System.exit(0);
+                    break;
+                default:
+                    System.out.println("Wrong choice. Try again.\n");
+                    break;
+            }
+        } while (choice != 1 && choice != 2 && choice != 3);
 
-		ObjectOutputStream out = new ObjectOutputStream(socket.getOutputStream());
-		ObjectInputStream in = new ObjectInputStream(socket.getInputStream());
+        chooseBoardSize();
+        Game game = new Game(boardSize);
 
-		Game game = (Game) in.readObject();
+        int rowStart;
+        int columnStart;
+        int rowMove;
+        int columnMove;
+        boolean turn;
+        int index;
 
-		while (true) {
-			sendAndReceiveMove(out, in, game);
-		}
-	}
+        List<Integer> indexList = new ArrayList<>();
 
-	private void sendAndReceiveMove(ObjectOutputStream out, ObjectInputStream in, Game game) throws Exception {
-		BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        while (!game.getGameOver()) {
+            turn = game.getPlayerTurn();
+            Field endMove = null;
+            String board = game.getBoard().displayBoard();
+            dout.writeUTF(board);
+            dout.flush();
+            dout.writeBoolean(game.getPlayerTurn());
+            dout.flush();
+            if (game.getPlayerTurn()) {
+                System.out.println("Ruch białych");
+            } else {
+                System.out.println("Ruch czarnych");
+            }
+            game.checkPossibleStartFields(game.getBoard());
+            if (game.isPlayerTurn()) {
+                System.out.println("Podaj litere kolumny, a potem numer rzedu wybranego pionka: \n");
+            } else {
+                String msg = "Podaj litere kolumny, a potem numer rzedu wybranego pionka: ";
+                dout.writeUTF(msg);
+                dout.flush();
+            }
+            while (true) {
+                int id;
+                if (game.isPlayerTurn()) {
+                    columnStart = (int) Character.toUpperCase(scanner.next().charAt(0)) - 65;
+                    rowStart = scanner.nextInt() - 1;
+                } else {
+                    columnStart = din.readInt();
+                    rowStart = din.readInt();
+                }
+                id = rowStart + 100 * columnStart;
+                if (game.getPossibleStartFields().contains(id)) {
+                    if (game.isPlayerTurn()) {
+                        break;
+                    } else {
+                        dout.writeBoolean(true);
+                        dout.flush();
+                        break;
+                    }
+                }
+                if (game.isPlayerTurn()) {
+                    System.out.println("Wybrano zly pionek, prosze wybrac ponownie");
+                }
+            }
+            game.getPossibleStartFields().clear();
+            while (turn == game.getPlayerTurn()) {
+                if (game.isPlayerTurn()) {
+                    System.out.println("Podaj litere kolumny, a potem numer rzedu planowanych ruchow, a jesli koniec to x: ");
+                } else {
+                    String msg = "Podaj litere kolumny, a potem numer rzedu planowanych ruchow, a jesli koniec to x: ";
+                    dout.writeUTF(msg);
+                    dout.flush();
+                }
+                while (true) {
+                    if (game.isPlayerTurn()) {
+                        columnMove = (int) Character.toUpperCase(scanner.next().charAt(0)) - 65;
+                        if (columnMove == 23) break;
+                        rowMove = scanner.nextInt() - 1;
+                    } else {
+                        columnMove = din.readInt();
+                        if (columnMove == 23) break;
+                        rowMove = din.readInt();
+                    }
+                    index = rowMove + 100 * columnMove;
+                    indexList.add(index);
+                    if (indexList.size() == 1) {
+                        endMove = game.getBoard().getFieldByIndex(rowMove, columnMove);
+                    }
+                }
+                game.move(game.getBoard().getFieldByIndex(rowStart, columnStart), endMove, indexList, game.getBoard());
+                indexList.clear();
+                if (game.isPlayerTurn()) {
+                    boolean msgBool = turn == game.getPlayerTurn();
+                    dout.writeBoolean(msgBool);
+                    dout.flush();
+                }
+            }
+            System.out.println(game.getBoard().displayBoard());
+            if (game.getBoard().getWhite().isEmpty() || game.getBoard().getBlack().isEmpty()) {
+                if (game.getBoard().getWhite().isEmpty()) {
+                    game.setWinner(true);
+                    System.out.println("Wygraly czarne");
+                } else if (game.getBoard().getBlack().isEmpty()) {
+                    game.setWinner(false);
+                    System.out.println("Wygraly biale");
+                }
+                game.setGameOver(true);
+            }
+            if (game.isPlayerTurn()) {
+                dout.writeBoolean(game.getGameOver());
+                dout.flush();
+            }
+            if (game.getGameOver()) {
+                din.close();
+                dout.close();
+            }
+        }
+    }
 
-		game.getBoard().displayBoard();
-		System.out.println("Czekanie na ruch serwera...");
-		game = (Game) in.readObject();
-		System.out.println("Klient poruszył się: " + game);
-		game.getBoard().displayBoard();
+    private static void chooseBoardSize() {
+        System.out.println("Choose board size: ");
+        System.out.println("1. Small (8x8)");
+        System.out.println("2. Classic (10x10)");
+        System.out.println("3. Big (12x12)\n");
 
-		System.out.println("Wpisz pionek do przesunięcia: ");
-		String pieceToMove = reader.readLine();
-		out.writeObject(pieceToMove);
-		out.flush();
+        Scanner scanner = new Scanner(System.in);
+        int choice;
+        do {
+            choice = scanner.nextInt();
+            switch (choice) {
+                case 1:
+                    setBoardSize(8);
+                    break;
+                case 2:
+                    setBoardSize(10);
+                    break;
+                case 3:
+                    setBoardSize(12);
+                    break;
+                default:
+                    System.out.println("Wrong choice. Try again.\n");
+                    break;
+            }
+        } while (choice != 1 && choice != 2 && choice != 3);
 
-		if(pieceToMove.equals("xx")){
-			throw new Exception("Wyszedłeś.");
-		}
+    }
 
-		System.out.println("Wpisz ruch jaki chcesz wykonać: ");
-		String move = reader.readLine();
+    public static void setBoardSize(int n) {
+        boardSize = n;
+    }
 
-		if(move.equals("xx")){
-			throw new Exception("Wyszedłeś.");
-		}
+    public void setOptions(Client options) {
+    }
 
-		out.writeObject(move);
-		out.flush();
-
-		game.makeMove(pieceToMove,move);
-		game.getBoard().displayBoard();
-
-	}
-
-	public void closeGame() throws IOException {
-		if (socket != null && !socket.isClosed()) {
-			socket.close();
-			System.out.println("Gra została zamknięta, a gniazdo klienta wyłączone.");
-		}
-	}
-
-	public static void main(String[] args) throws Exception {
-		Client client = new Client("localhost", 9899);
-		client.connect();
-	}
+    public static void printMenu() {
+        System.out.println("Welcome to Checkers!");
+        System.out.println("1. New game");
+        System.out.println("2. Load game");
+        System.out.println("3. Exit\n");
+    }
 }
