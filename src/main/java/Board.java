@@ -22,12 +22,8 @@ public class Board implements Serializable {
 
         initializeBoard();
         initializePieces();
-        displayBoard();
+        System.out.println(displayBoard());
 
-    }
-
-    public Piece getPiece(int x, int y) {
-        return board[x][y].getPiece();
     }
 
     private void initializeBoard() {
@@ -71,7 +67,7 @@ public class Board implements Serializable {
     private void initializePieces() {
         for (int i = 0; i < n / 2 - 1; i++) {
             for (int j = 0; j < n; j++) {
-                if ((i + j) % 2 == 0) { //tworzenie tylko nieparzystych pól planszy
+                if ((i + j) % 2 == 0) { //tworzenie tylko nieparzystych pól PLANSZY
                     Piece piece = new Piece(true, i, j); //tworzenie nowego pionka białego
                     white.put(piece.getId(), piece); //dodanie pionka do listy białych pionków
                     getFieldByIndex(i, j).setPiece(piece); //ustawienie pionka na planszy
@@ -103,10 +99,6 @@ public class Board implements Serializable {
         return board[i][j];
     }
 
-    public Field[][] getBoard() {
-        return board;
-    }
-
     public Map<Integer, Piece> getWhite() {
         return white;
     }
@@ -126,44 +118,44 @@ public class Board implements Serializable {
         }
     }
 
-    void displayBoard() {
-        System.out.print("  ");
+    String displayBoard() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("  ");
         for (int i = 0; i < n; i++) {
-            System.out.print(" " + (char) ('A' + i));
+            sb.append(" ").append((char) ('A' + i));
         }
-        System.out.println();
+        sb.append("\n");
 
         int id = 1;
 
         for (int i = 0; i < n; i++) {
             if (i + 1 < 10) {
-                System.out.print(i + 1 + " ");
+                sb.append(i+1).append(" ");
             } else {
-                System.out.print(i + 1);
+                sb.append(i + 1);
             }
             for (int j = 0; j < n; j++) {
                 if ((i + j) % 2 == 0) {
                     Field field = getFieldByIndex(i, j);
                     if (field.getPiece() == null) {
-                        System.out.print(" .");
+                        sb.append(" .");
                     } else {
-                        System.out.print(" " + field.getPiece().getSymbol());
+                        sb.append(" ").append(field.getPiece().getSymbol());
                     }
                 } else {
-                    System.out.print("  ");
+                    sb.append("  ");
                 }
             }
-
-                System.out.println("  " + (i + 1) + " ");
+                sb.append("  ").append(i + 1).append(" ");
+                sb.append("\n");
 
         }
-
-        System.out.print("  ");
+        sb.append("  ");
         for (int i = 0; i < n; i++) {
-            System.out.print(" " + (char) ('A' + i));
+            sb.append(" ").append((char) ('A' + i));
         }
-        System.out.println();
-
+        sb.append("\n");
+        return sb.toString();
     }
 
 
